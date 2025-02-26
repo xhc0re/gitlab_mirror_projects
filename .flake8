@@ -1,5 +1,5 @@
 [flake8]
 max-line-length = 100
 exclude = .git,__pycache__,build,dist
-# Temporarily ignore reported errors until we can fix them
+# Temporarily ignore reported errors
 ignore = E221,E231,E241,E501,F401
