@@ -1,0 +1,94 @@
+#compdef gitlab-mirror gitlab-mirror-batch-remove gitlab-mirror-remove gitlab-mirror-trigger gitlab-mirror-update gitlab-mirror-verify
+
+# Zsh completion script for GitLab Mirror CLI commands
+
+_gitlab_mirror_batch_remove() {
+    _arguments \
+        '(--csv-file)--csv-file=[CSV file with project paths]:File:_files' \
+        '(--dry-run)--dry-run[Only show what would be removed]' \
+        '(--gitlab-url)--gitlab-url=[GitLab URL]:URL:_urls' \
+        '(--token)--token=[GitLab token]:Token' \
+        '(--debug)--debug[Enable debug logging]' \
+        '(--help -h)'{--help,-h}'[Show help message]'
+}
+
+_gitlab_mirror_remove() {
+    _arguments \
+        '(--pattern)--pattern=[Regex pattern to match mirror URLs]:Pattern' \
+        '(--remove-failed)--remove-failed[Remove mirrors with errors]' \
+        '(--all)--all[WARNING: Remove ALL mirrors from ALL projects]' \
+        '(--dry-run)--dry-run[Only show what would be removed]' \
+        '(--gitlab-url)--gitlab-url=[GitLab URL]:URL:_urls' \
+        '(--token)--token=[GitLab token]:Token' \
+        '(--debug)--debug[Enable debug logging]' \
+        '(--help -h)'{--help,-h}'[Show help message]'
+}
+
+_gitlab_mirror_trigger() {
+    _arguments \
+        '(--projects-file)--projects-file=[File with project paths]:File:_files' \
+        '(--batch-size)--batch-size=[Number of projects per batch]:Number' \
+        '(--delay)--delay=[Delay between projects in seconds]:Seconds' \
+        '(--source-url)--source-url=[Source GitLab URL]:URL:_urls' \
+        '(--source-token)--source-token=[Source GitLab token]:Token' \
+        '(--debug)--debug[Enable debug logging]' \
+        '(--help -h)'{--help,-h}'[Show help message]'
+}
+
+_gitlab_mirror_update() {
+    _arguments \
+        '(--pattern)--pattern=[Regex pattern to match mirror URLs]:Pattern' \
+        '(--update-failed)--update-failed[Update mirrors with authentication errors]' \
+        '(--old-domain)--old-domain=[Old domain to replace]:Domain' \
+        '(--new-domain)--new-domain=[New domain to use]:Domain' \
+        '(--dry-run)--dry-run[Test without making changes]' \
+        '(--source-url)--source-url=[Source GitLab URL]:URL:_urls' \
+        '(--source-token)--source-token=[Source GitLab token]:Token' \
+        '(--debug)--debug[Enable debug logging]' \
+        '(--help -h)'{--help,-h}'[Show help message]'
+}
+
+_gitlab_mirror_verify() {
+    _arguments \
+        '(--projects-file)--projects-file=[CSV file with project mappings]:File:_files' \
+        '(--source-url)--source-url=[Source GitLab URL]:URL:_urls' \
+        '(--source-token)--source-token=[Source GitLab token]:Token' \
+        '(--target-url)--target-url=[Target GitLab URL]:URL:_urls' \
+        '(--target-token)--target-token=[Target GitLab token]:Token' \
+        '(--debug)--debug[Enable debug logging]' \
+        '(--help -h)'{--help,-h}'[Show help message]'
+}
+
+_gitlab_mirror() {
+    _arguments \
+        '(--source-url)--source-url=[Source GitLab URL]:URL:_urls' \
+        '(--source-token)--source-token=[Source GitLab token]:Token' \
+        '(--target-url)--target-url=[Target GitLab URL]:URL:_urls' \
+        '(--target-token)--target-token=[Target GitLab token]:Token' \
+        '(--projects-file)--projects-file=[CSV file with project mappings]:File:_files' \
+        '(--assign-users)--assign-users[Assign users from source to target groups]' \
+        '(--debug)--debug[Enable debug logging]' \
+        '(--help -h)'{--help,-h}'[Show help message]'
+}
+
+# Dispatch to the appropriate completion function based on the command name
+case "$service" in
+    gitlab-mirror-batch-remove)
+        _gitlab_mirror_batch_remove
+        ;;
+    gitlab-mirror-remove)
+        _gitlab_mirror_remove
+        ;;
+    gitlab-mirror-trigger)
+        _gitlab_mirror_trigger
+        ;;
+    gitlab-mirror-update)
+        _gitlab_mirror_update
+        ;;
+    gitlab-mirror-verify)
+        _gitlab_mirror_verify
+        ;;
+    gitlab-mirror)
+        _gitlab_mirror
+        ;;
+esac

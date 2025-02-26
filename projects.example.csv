@@ -1,0 +1,3 @@
+ci-cd-configuration/mirror-me,testgroup1
+ci-cd-configuration/gitlab-dockerized,testgroup1/testsubgroup1
+ci-cd-configuration/mirror-projects,testgroup2/testsubgroup2/testsubgroup3
