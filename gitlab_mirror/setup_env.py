@@ -1,9 +1,7 @@
 #!/usr/bin/env python
 """Setup script for GitLab mirror environment."""
 
-import os
 import shutil
-import sys
 from pathlib import Path
 
 
@@ -39,7 +37,7 @@ def create_env_file():
             "",
         )
 
-        with open(env_path, "w") as f:
+        with open(env_path, "w", encoding="utf-8") as f:
             f.write(f'SOURCE_GITLAB_URL="{source_url}"\n')
             f.write(f'SOURCE_GITLAB_TOKEN="{source_token}"\n')
             f.write(f'TARGET_GITLAB_URL="{target_url}"\n')
@@ -57,7 +55,7 @@ def create_example_projects_file():
         print("projects.example.csv already exists.")
         return
 
-    with open(file_path, "w") as f:
+    with open(file_path, "w", encoding="utf-8") as f:
         f.write("# Source project path, Target group path\n")
         f.write("group1/project1,newgroup1\n")
         f.write("group2/subgroup1/project2,\n")
@@ -69,10 +67,10 @@ def create_example_projects_file():
 def check_dependencies():
     """Check if required Python packages are installed."""
     try:
-        import gitlab
-        import pandas
-        import pydantic
-        from dotenv import load_dotenv
+        import gitlab  # noqa: F401
+        import pandas  # noqa: F401
+        import pydantic  # noqa: F401
+        from dotenv import load_dotenv  # noqa: F401
     except ImportError as e:
         print(f"Missing dependency: {e}")
         print("Please install required dependencies:")
