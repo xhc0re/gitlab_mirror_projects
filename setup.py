@@ -1,4 +1,4 @@
-from setuptools import setup, find_packages
+from setuptools import find_packages, setup
 
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
@@ -27,6 +27,20 @@ setup(
         "pandas>=2.0.0,<3.0.0",
         "setuptools>=75.8,<76.0",
     ],
+    extras_require={
+        "dev": [
+            "black>=23.3.0",
+            "isort>=5.12.0",
+            "flake8>=6.0.0",
+            "mypy>=1.3.0",
+            "pre-commit>=3.3.2",
+            "pytest>=7.3.1",
+            "pytest-cov>=4.1.0",
+            "bandit>=1.7.5",
+            "sphinx>=6.2.1",
+            "sphinx-rtd-theme>=1.2.2",
+        ],
+    },
     entry_points={
         "console_scripts": [
             "gitlab-mirror=gitlab_mirror.cli.main:main",

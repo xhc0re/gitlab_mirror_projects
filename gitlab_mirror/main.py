@@ -4,6 +4,7 @@ Provides backward compatibility with the old interface.
 """
 
 import sys
+
 from gitlab_mirror.cli.main import main
 
 if __name__ == "__main__":

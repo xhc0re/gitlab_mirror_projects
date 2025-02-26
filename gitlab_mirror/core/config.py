@@ -2,18 +2,18 @@
 Configuration module for the GitLab mirroring project.
 
 This module provides configuration classes and validation for the project.
-It uses Pydantic for configuration validation and dotenv for loading 
+It uses Pydantic for configuration validation and dotenv for loading
 environment variables.
 """
 
-import os
 import logging
+import os
 from pathlib import Path
 from typing import Optional
 
 import gitlab
-from pydantic import BaseModel, SecretStr, field_validator
 from dotenv import load_dotenv
+from pydantic import BaseModel, SecretStr, field_validator
 
 from gitlab_mirror.core.exceptions import ConfigError
 
@@ -23,31 +23,35 @@ logger = logging.getLogger(__name__)
 # Load environment variables from .env file
 load_dotenv()
 
+
 class GitLabConfig(BaseModel):
     """Configuration for GitLab connection with validation."""
+
     url: str
     token: SecretStr
 
-    @field_validator('url')
+    @field_validator("url")
     @classmethod
     def validate_url(cls, v):
         """Validates URL."""
-        if not v.startswith(('http://', 'https://')):
-            raise ValueError('URL must start with http:// or https://')
+        if not v.startswith(("http://", "https://")):
+            raise ValueError("URL must start with http:// or https://")
         return v
 
     def get_client(self) -> gitlab.Gitlab:
         """Creates and returns a GitLab client."""
         return gitlab.Gitlab(url=self.url, private_token=self.token.get_secret_value())
 
+
 class MirrorConfig(BaseModel):
     """Overall configuration for the mirroring process."""
+
     source: GitLabConfig
     target: GitLabConfig
     projects_file: Path
     assign_users: bool = False
-    
-    @field_validator('projects_file')
+
+    @field_validator("projects_file")
     @classmethod
     def validate_projects_file(cls, v):
         """Validates integrity of projects file"""
@@ -55,35 +59,37 @@ class MirrorConfig(BaseModel):
             raise ValueError(f"Projects file does not exist: {v}")
         return v
 
+
 def get_env_variable(name: str, required: bool = False) -> Optional[str]:
     """
     Retrieve environment variable. Exit if required and missing.
-    
+
     Args:
         name: Name of the environment variable
         required: Whether the variable is required
-        
+
     Returns:
         Value of the environment variable or None if not required and not found
-        
+
     Raises:
         ConfigError: If the variable is required but not found
     """
     value = os.getenv(name)
-    
+
     if required and not value:
         logger.error("Missing required environment variable: %s", name)
         raise ConfigError(f"Missing required environment variable: {name}")
-    
+
     return value
+
 
 def load_config_from_env() -> MirrorConfig:
     """
     Load configuration from environment variables.
-    
+
     Returns:
         MirrorConfig object with validated configuration
-        
+
     Raises:
         ConfigError: If any required configuration is missing or invalid
     """
@@ -94,19 +100,19 @@ def load_config_from_env() -> MirrorConfig:
         target_token = get_env_variable("TARGET_GITLAB_TOKEN", required=True)
         projects_file = get_env_variable("PROJECTS_FILE", required=True)
         assign_users = get_env_variable("ASSIGN_USERS_TO_GROUPS", required=False)
-        
+
         if assign_users:
-            assign_users = assign_users.lower() in ('true', 'yes', '1')
+            assign_users = assign_users.lower() in ("true", "yes", "1")
         else:
             assign_users = False
-            
+
         config = MirrorConfig(
             source=GitLabConfig(url=source_url, token=SecretStr(source_token)),
             target=GitLabConfig(url=target_url, token=SecretStr(target_token)),
             projects_file=Path(projects_file),
-            assign_users=assign_users
+            assign_users=assign_users,
         )
-        
+
         return config
     except ValueError as e:
         logger.error("Configuration validation error: %s", e)

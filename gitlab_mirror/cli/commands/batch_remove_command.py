@@ -5,9 +5,9 @@ This module provides the CLI command for removing GitLab push mirrors
 for projects specified in a CSV file.
 """
 
-import sys
 import argparse
 import logging
+import sys
 import traceback
 
 from dotenv import load_dotenv
@@ -18,12 +18,14 @@ from gitlab_mirror.utils.batch_remove import remove_mirrors_from_csv
 
 logger = logging.getLogger(__name__)
 
+
 def setup_logging(level=logging.INFO):
     """Configure logging for the application."""
     logging.basicConfig(
         format="%(asctime)s [%(levelname)s] %(message)s",
         level=level,
     )
+
 
 def main():
     """Main entry point for the batch remove command."""
@@ -34,6 +36,8 @@ def main():
     load_dotenv()
 
     # Create a more descriptive argument parser with examples and formatting
+
+
 parser = argparse.ArgumentParser(
     description="Remove push mirrors for projects specified in a CSV file.",
     epilog="""
@@ -47,7 +51,7 @@ Input file formats:
     - CSV with headers: source_path,target_group
     - CSV without headers: first column contains project paths
     - Plain text: one project path per line
-    
+
     Project paths should include the full path with namespace (e.g., "group/project")
 
 Environment Variables:
@@ -68,46 +72,42 @@ Related Commands:
     gitlab-mirror-remove       Remove mirrors by pattern or status
     gitlab-mirror-verify       Generate lists of projects needing attention
     """,
-    formatter_class=argparse.RawDescriptionHelpFormatter
+    formatter_class=argparse.RawDescriptionHelpFormatter,
 )
 
 # Group connection arguments
-connection_group = parser.add_argument_group('GitLab Connection')
+connection_group = parser.add_argument_group("GitLab Connection")
 connection_group.add_argument(
     "--gitlab-url",
     help="GitLab URL (default: from SOURCE_GITLAB_URL env var)",
-    default=get_env_variable("SOURCE_GITLAB_URL")
+    default=get_env_variable("SOURCE_GITLAB_URL"),
 )
 connection_group.add_argument(
     "--token",
     help="GitLab token (default: from SOURCE_GITLAB_TOKEN env var)",
-    default=get_env_variable("SOURCE_GITLAB_TOKEN")
+    default=get_env_variable("SOURCE_GITLAB_TOKEN"),
 )
 
 # Group input arguments
-input_group = parser.add_argument_group('Input')
+input_group = parser.add_argument_group("Input")
 input_group.add_argument(
     "--csv-file",
     help="CSV file with project paths (default: from PROJECTS_FILE env var)",
-    default=get_env_variable("PROJECTS_FILE", "projects.csv")
+    default=get_env_variable("PROJECTS_FILE", "projects.csv"),
 )
 
 # Group behavior arguments
-behavior_group = parser.add_argument_group('Behavior')
+behavior_group = parser.add_argument_group("Behavior")
 behavior_group.add_argument(
     "--dry-run",
     help="Only show what would be removed, don't actually remove",
     action="store_true",
-    default=False
+    default=False,
 )
 
 # Debug options
-debug_group = parser.add_argument_group('Debug Options')
-debug_group.add_argument(
-    "--debug",
-    help="Enable debug logging",
-    action="store_true"
-)
+debug_group = parser.add_argument_group("Debug Options")
+debug_group.add_argument("--debug", help="Enable debug logging", action="store_true")
 
 args = parser.parse_args()
 
@@ -133,7 +133,7 @@ try:
         gitlab_url=args.gitlab_url,
         private_token=args.token,
         csv_file=args.csv_file,
-        dry_run=args.dry_run
+        dry_run=args.dry_run,
     )
 
     # Print summary
@@ -147,20 +147,22 @@ try:
     else:
         print(f"Mirrors removed: {result['mirrors_removed']}")
 
-    if result['failed_projects']:
+    if result["failed_projects"]:
         print("\nFailed operations:")
-        for project in result['failed_projects'][:5]:
+        for project in result["failed_projects"][:5]:
             print(f"  - {project['project']}: {project['error']}")
-        if len(result['failed_projects']) > 5:
+        if len(result["failed_projects"]) > 5:
             print(f"  ... and {len(result['failed_projects']) - 5} more")
 
         # Export failed projects to CSV
-        with open('batch-remove-failed.csv', 'w', encoding='utf-8') as f:
+        with open("batch-remove-failed.csv", "w", encoding="utf-8") as f:
             f.write("project,error\n")
-            for failed in result['failed_projects']:
-                SANITIZED_ERROR = str(failed['error']).replace(',', ';')
+            for failed in result["failed_projects"]:
+                SANITIZED_ERROR = str(failed["error"]).replace(",", ";")
                 f.write(f"{failed['project']},{SANITIZED_ERROR}\n")
-        print(f"Exported {len(result['failed_projects'])} failed projects to batch-remove-failed.csv")
+        print(
+            f"Exported {len(result['failed_projects'])} failed projects to batch-remove-failed.csv"
+        )
 
 except ConfigError as e:
     logger.error("Configuration error: %s", e)
