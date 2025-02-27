@@ -98,18 +98,24 @@ def load_config_from_env() -> MirrorConfig:
         source_token = get_env_variable("SOURCE_GITLAB_TOKEN", required=True)
         target_url = get_env_variable("TARGET_GITLAB_URL", required=True)
         target_token = get_env_variable("TARGET_GITLAB_TOKEN", required=True)
-        projects_file = get_env_variable("PROJECTS_FILE", required=True)
-        assign_users = get_env_variable("ASSIGN_USERS_TO_GROUPS", required=False)
+        projects_file_str = get_env_variable("PROJECTS_FILE", required=True)
+        assign_users_str = get_env_variable("ASSIGN_USERS_TO_GROUPS", required=False)
 
-        if assign_users:
-            assign_users = assign_users.lower() in ("true", "yes", "1")
-        else:
-            assign_users = False
+        # Convert assign_users_str to bool
+        assign_users = False
+        if assign_users_str:
+            assign_users = assign_users_str.lower() in ("true", "yes", "1")
+
+        # Validate projects_file
+        if not projects_file_str:
+            raise ConfigError("PROJECTS_FILE environment variable is empty")
+
+        projects_file = Path(projects_file_str)
 
         config = MirrorConfig(
             source=GitLabConfig(url=source_url, token=SecretStr(source_token)),
             target=GitLabConfig(url=target_url, token=SecretStr(target_token)),
-            projects_file=Path(projects_file),
+            projects_file=projects_file,
             assign_users=assign_users,
         )
 

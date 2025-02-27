@@ -4,7 +4,7 @@ Utility module for removing GitLab push mirrors based on specified criteria.
 
 import logging
 import re
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 import gitlab
 
@@ -19,7 +19,7 @@ def remove_mirrors(
     remove_failed: bool = False,
     remove_all: bool = False,
     dry_run: bool = False,
-) -> Dict[str, int]:
+) -> Dict[str, Any]:
     """
     Remove push mirrors from GitLab projects based on specified criteria.
 

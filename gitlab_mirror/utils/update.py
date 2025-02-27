@@ -25,7 +25,7 @@ def is_mirror_failing(mirror) -> bool:
 
 
 def update_mirror_auth(
-    mirror, new_token: str, old_domain: str = None, new_domain: str = None
+    mirror, new_token: str, old_domain: Optional[str] = None, new_domain: Optional[str] = None
 ) -> bool:
     """Update mirror authentication by replacing the token and optionally the domain."""
     try:
@@ -33,7 +33,7 @@ def update_mirror_auth(
         if old_domain and new_domain:
             base_url = base_url.replace(old_domain, new_domain)
 
-        new_url = f"https://oauth2:{new_token}@{base_url}"
+        new_url = f"https://oauth2:{new_token}@{base_url}"  # noqa E231
         mirror.url = new_url
         mirror.enabled = True
         mirror.save()
@@ -148,7 +148,7 @@ def update_mirrors(
             f.write("project,error\n")
             for fail in failed_projects:
                 sanitized_error = fail["error"].replace(",", ";")
-                f.write(f"{fail['project']},{sanitized_error}\n")
+                f.write(f"{fail['project']}, {sanitized_error}\n")
         logger.info(
             "Exported %d failed projects to 05-update-failed-projects.csv", len(failed_projects)
         )
