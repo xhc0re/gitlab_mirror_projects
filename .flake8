@@ -2,4 +2,4 @@
 max-line-length = 150
 exclude = .git,__pycache__,build,dist
 # Temporarily ignore reported errors until we can fix them
-ignore = E221,E231,E241,E501,F401
+ignore = E221,E231,E241,E501,F401,E203
