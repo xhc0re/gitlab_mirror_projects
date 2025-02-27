@@ -131,7 +131,7 @@ def process_file(file_path, batch_size=5, delay_between_projects=2):
 
     # Process in batches
     for i in range(0, total, batch_size):
-        batch = projects[i : i + batch_size]
+        batch = projects[i : i + batch_size]  # noqa E203
         logger.info(
             "Processing batch %d/%d", i // batch_size + 1, (total + batch_size - 1) // batch_size
         )
