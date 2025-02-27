@@ -93,7 +93,7 @@ input_group = parser.add_argument_group("Input")
 input_group.add_argument(
     "--csv-file",
     help="CSV file with project paths (default: from PROJECTS_FILE env var)",
-    default=get_env_variable("PROJECTS_FILE", "projects.csv"),
+    default=get_env_variable("PROJECTS_FILE", required=False) or "projects.csv",
 )
 
 # Group behavior arguments
@@ -150,7 +150,7 @@ try:
     if result["failed_projects"]:
         print("\nFailed operations:")
         for project in result["failed_projects"][:5]:
-            print(f"  - {project['project']}: {project['error']}")
+            print(f" - {project['project']}: {project['error']}")
         if len(result["failed_projects"]) > 5:
             print(f"  ... and {len(result['failed_projects']) - 5} more")
 
@@ -159,7 +159,7 @@ try:
             f.write("project,error\n")
             for failed in result["failed_projects"]:
                 SANITIZED_ERROR = str(failed["error"]).replace(",", ";")
-                f.write(f"{failed['project']},{SANITIZED_ERROR}\n")
+                f.write(f"{failed['project']}, {SANITIZED_ERROR}\n")
         print(
             f"Exported {len(result['failed_projects'])} failed projects to batch-remove-failed.csv"
         )
