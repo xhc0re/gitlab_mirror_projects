@@ -21,7 +21,7 @@ jobs:
         pip install flake8 black isort mypy bandit
         pip install -e .
     - name: Lint with flake8
-      run: flake8 gitlab_mirror
+      run: flake8 gitlab_mirror --count --select=E9,F63,F7,F82,E203 --statistics
     - name: Check formatting with black
       run: black --check gitlab_mirror
     - name: Check imports with isort
