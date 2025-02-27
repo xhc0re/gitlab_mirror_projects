@@ -186,7 +186,7 @@ class MirrorService:
                 f"Failed to load project mappings from {self.config.projects_file}"
             ) from e
 
-    def ensure_group_exists(self, group_path: str) -> int:
+    def ensure_group_exists(self, group_path: str) -> Any:
         """Ensure a group exists, creating it if necessary."""
         if not group_path:
             raise ValueError("Group path cannot be empty")
@@ -320,7 +320,7 @@ class MirrorService:
 
             # Set up mirroring
             target_domain = self.target.config.url.split("//")[1].split("/")[0]
-            mirror_url = f"https://oauth2:{self.target.config.token.get_secret_value()}@{target_domain}/{target_path}.git"
+            mirror_url = f"https://oauth2:{self.target.config.token.get_secret_value()}@{target_domain}/{target_path}.git"  # noqa: E501, E231
 
             self.setup_push_mirror(source_project, mirror_url)
 
@@ -405,7 +405,7 @@ class MirrorService:
         print("\nMirroring Errors Summary:")
         print("=" * 50)
         for idx, error in enumerate(self.errors, 1):
-            print(f"Error #{idx}:")
+            print(f"Error #{idx}: ")
             print(f"  Source Project: {error['source']}")
             print(f"  Target Path:    {error['target']}")
             print(f"  Error Type:     {error['error_type']}")

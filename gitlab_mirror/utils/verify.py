@@ -3,7 +3,7 @@ Utility module for verifying GitLab project mirroring status.
 """
 
 import logging
-from typing import Tuple
+from typing import Any, Dict, List, Tuple
 
 from gitlab_mirror.core.config import GitLabConfig
 
@@ -32,13 +32,13 @@ class MirrorVerifier:
         self.project_mappings = project_mappings
 
         # Cache for GitLab projects to avoid repeated API calls
-        self.source_projects_cache = {}
-        self.target_projects_cache = {}
+        self.source_projects_cache: Dict[Any, Any] = {}
+        self.target_projects_cache: Dict[Any, Any] = {}
 
         # Results
-        self.missing_in_target = []
-        self.missing_mirrors = []
-        self.failed_mirrors = []
+        self.missing_in_target: List[int] = []
+        self.missing_mirrors: List[int] = []
+        self.failed_mirrors: List[int] = []
         self.success_count = 0
 
     def cache_all_projects(self):
@@ -74,36 +74,48 @@ class MirrorVerifier:
     def check_mirror_exists(self, source_project_id: int, target_path: str) -> Tuple[bool, str]:
         """
         Check if mirror from source to target exists and is working.
-
-        Args:
-            source_project_id: ID of source project
-            target_path: Path of target project
-
-        Returns:
-            Tuple of (mirror_exists, error_message)
         """
         try:
-            project = self.source_gl.projects.get(source_project_id)
+            # Get the proper GitLab client
+            source_client = self.source_gl.get_client()
+            project = source_client.projects.get(source_project_id)
             mirrors = project.remote_mirrors.list()
 
-            target_domain = self.target_gl.url.split("//")[1].split("/")[0]
+            # Extract domain more carefully
+            parsed_url = self.target_gl.url.rstrip("/")
+            if "://" in parsed_url:
+                parsed_url = parsed_url.split("://", 1)[1]
+            if "/" in parsed_url:
+                target_domain = parsed_url.split("/", 1)[0]
+            else:
+                target_domain = parsed_url
+
             expected_mirror_path = f"{target_domain}/{target_path}.git"
 
+            # Log for debugging
+            logger.debug(f"Looking for mirror with path: {expected_mirror_path}")
             for mirror in mirrors:
                 mirror_url = normalize_mirror_url(mirror.url)
-                if expected_mirror_path in mirror_url:
+                logger.debug(f"Found mirror URL: {mirror_url}")
+
+                # More precise comparison
+                if mirror_url.endswith(expected_mirror_path):
                     # Mirror exists, check if it's working
-                    if not mirror.enabled or hasattr(mirror, "last_error") and mirror.last_error:
-                        return True, (
+                    if not mirror.enabled or (hasattr(mirror, "last_error") and mirror.last_error):
+                        return (
+                            True,
                             mirror.last_error
                             if hasattr(mirror, "last_error")
-                            else "Mirror is disabled"
-                        )
+                            else "Mirror is disabled",
+                        )  # noqa: E501
                     return True, ""
 
+            # No matching mirror found
+            logger.warning(f"No mirror found matching {expected_mirror_path}")
             return False, "No mirror configured"
 
         except Exception as e:
+            logger.exception(f"Error checking mirror: {e}")
             return False, str(e)
 
     def verify_all_projects(self):
@@ -163,23 +175,23 @@ class MirrorVerifier:
         logger.info(f"Successfully mirrored: {self.success_count}")
 
         if self.missing_in_target:
-            logger.warning(f"Projects missing in target ({len(self.missing_in_target)}):")
+            logger.warning(f"Projects missing in target ({len(self.missing_in_target)}): ")
             for source, target, _ in self.missing_in_target[:10]:
-                logger.warning(f"  - {source} -> {target}")
+                logger.warning(f" - {source} -> {target}")
             if len(self.missing_in_target) > 10:
                 logger.warning(f"  ... and {len(self.missing_in_target) - 10} more")
 
         if self.missing_mirrors:
-            logger.warning(f"Projects without mirrors ({len(self.missing_mirrors)}):")
+            logger.warning(f"Projects without mirrors ({len(self.missing_mirrors)}): ")
             for source, target, _ in self.missing_mirrors[:10]:
-                logger.warning(f"  - {source} -> {target}")
+                logger.warning(f" - {source} -> {target}")
             if len(self.missing_mirrors) > 10:
                 logger.warning(f"  ... and {len(self.missing_mirrors) - 10} more")
 
         if self.failed_mirrors:
-            logger.warning(f"Projects with failed mirrors ({len(self.failed_mirrors)}):")
+            logger.warning(f"Projects with failed mirrors ({len(self.failed_mirrors)}): ")
             for source, target, error, _ in self.failed_mirrors[:10]:
-                logger.warning(f"  - {source} -> {target}: {error}")
+                logger.warning(f" - {source} -> {target}: {error}")
             if len(self.failed_mirrors) > 10:
                 logger.warning(f"  ... and {len(self.failed_mirrors) - 10} more")
 
@@ -193,14 +205,14 @@ class MirrorVerifier:
             with open("01-missing-in-target.csv", "w") as f:
                 f.write("source_path,target_path\n")
                 for source, target, _ in self.missing_in_target:
-                    f.write(f"{source},{target}\n")
+                    f.write(f"{source}, {target}\n")
             logger.info("Exported missing target projects to 01-missing-in-target.csv")
 
         if self.missing_mirrors:
             with open("02-missing-mirrors.csv", "w") as f:
                 f.write("source_path,target_path\n")
                 for source, target, _ in self.missing_mirrors:
-                    f.write(f"{source},{target}\n")
+                    f.write(f"{source}, {target}\n")
             logger.info("Exported missing mirrors to 02-missing-mirrors.csv")
 
         if self.failed_mirrors:
@@ -209,7 +221,7 @@ class MirrorVerifier:
                 for source, target, error, _ in self.failed_mirrors:
                     # Replace commas in error message to avoid CSV issues
                     sanitized_error = error.replace(",", ";")
-                    f.write(f"{source},{target},{sanitized_error}\n")
+                    f.write(f"{source}, {target}, {sanitized_error}\n")
             logger.info("Exported failed mirrors to 03-failed-mirrors.csv")
 
         # Generate fix.csv with the format matching projects.csv
@@ -239,7 +251,7 @@ class MirrorVerifier:
         if unique_fix_projects:
             with open("00-fix.csv", "w") as f:
                 for source_path, target_group in unique_fix_projects:
-                    f.write(f"{source_path},{target_group}\n")
+                    f.write(f"{source_path}, {target_group}\n")
             logger.info(
                 f"Exported {len(unique_fix_projects)} projects to 00-fix.csv in projects.csv format"
             )

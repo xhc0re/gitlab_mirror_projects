@@ -124,7 +124,7 @@ Warning:
     # Check to see if at least one mirrored selection condition is given
     if not args.pattern and not args.remove_failed and not args.all:
         logger.error(
-            "No selection criteria provided. Please specify at least one of: --pattern, --remove-failed, or --all"
+            "No selection criteria provided. Please specify at least one of: --pattern, --remove-failed, or --all"  # noqa: E501
         )
         logger.error("You can also set MIRROR_PATTERN or REMOVE_FAILED_MIRRORS in your .env file")
         sys.exit(1)
@@ -157,7 +157,7 @@ Warning:
             )
 
             print(
-                f"\nWould remove approximately {result['would_remove']} mirrors from {result['matching_projects']} projects"
+                f"\nWould remove approximately {result['would_remove']} mirrors from {result['matching_projects']} projects"  # noqa: E501
             )
             sys.exit(0)
 
@@ -165,7 +165,7 @@ Warning:
         if args.all:
             print("WARNING: You are about to remove ALL mirrors from ALL projects!")
             confirmation = input(
-                "Are you ABSOLUTELY sure? This cannot be undone. Type 'YES' (all capitals) to confirm: "
+                "Are you ABSOLUTELY sure? This cannot be undone. Type 'YES' (all capitals) to confirm: "  # noqa: E501
             )
             if confirmation != "YES":
                 print("Operation cancelled.")
@@ -204,7 +204,7 @@ Warning:
         if result["failed_projects"]:
             print("\nFailed projects:")
             for project in result["failed_projects"][:5]:
-                print(f"  - {project['project']}: {project['error']}")
+                print(f" - {project['project']}: {project['error']}")
             if len(result["failed_projects"]) > 5:
                 print(f"  ... and {len(result['failed_projects']) - 5} more")
 
