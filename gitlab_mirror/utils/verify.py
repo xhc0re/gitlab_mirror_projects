@@ -104,9 +104,11 @@ class MirrorVerifier:
                     if not mirror.enabled or (hasattr(mirror, "last_error") and mirror.last_error):
                         return (
                             True,
-                            mirror.last_error
-                            if hasattr(mirror, "last_error")
-                            else "Mirror is disabled",
+                            (
+                                mirror.last_error
+                                if hasattr(mirror, "last_error")
+                                else "Mirror is disabled"
+                            ),
                         )  # noqa: E501
                     return True, ""
 
