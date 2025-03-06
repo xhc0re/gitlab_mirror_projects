@@ -16,7 +16,9 @@ logger = logging.getLogger(__name__)
 
 def normalize_mirror_url(url: str) -> str:
     """Normalize mirror URL by removing credentials for comparison."""
-    return url.rsplit("@", 1)[-1] if "@" in url else url
+    if "@" in url:
+        return url.split("@", 1)[-1]
+    return url
 
 
 def is_mirror_failing(mirror) -> bool:

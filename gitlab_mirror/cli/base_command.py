@@ -101,7 +101,7 @@ class BaseCommand:
         self.parser.add_argument(
             "--projects-file",
             help="CSV file with project mappings (default: from PROJECTS_FILE env var)",
-            ddefault=get_env_variable("PROJECTS_FILE", required=False) or "projects.csv",
+            default=get_env_variable("PROJECTS_FILE", required=False) or "projects.csv",
             required=required,
         )
 

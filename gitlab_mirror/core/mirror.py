@@ -5,6 +5,7 @@ Provides abstraction for GitLab connections and mirroring operations.
 
 import csv
 import logging
+import time
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -326,7 +327,7 @@ class MirrorService:
 
             # Trigger initial sync
             self.trigger_mirror_sync(source_project.id)
-
+            time.sleep(600)
             return True
         except ApiError as e:
             logger.error("API error mirroring project %s: %s", mapping.source_path, e)

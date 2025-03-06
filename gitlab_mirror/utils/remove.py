@@ -111,7 +111,7 @@ def remove_mirrors(
                         project_mirrors_removed += 1
                     else:
                         try:
-                            # mirror.delete()
+                            mirror.delete()
                             project_mirrors_removed += 1
                             mirrors_removed += 1
                             logger.info(
