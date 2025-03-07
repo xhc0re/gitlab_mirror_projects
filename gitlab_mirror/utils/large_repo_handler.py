@@ -370,99 +370,138 @@ class LargeRepoHandler:
     def find_already_pushed_commits(self) -> set:
         """
         Determine which commits have already been pushed to the target repository.
-
+        
         Returns:
             Set of commit SHAs that exist in the target repository
         """
         logger.info("Checking for commits already pushed to target repository")
-
+        
+        # First, make sure the target remote is set up correctly
+        if not self.setup_target_remote():
+            logger.warning("Could not set up target remote to check for existing commits")
+            return set()
+        
         # Fetch from target to get its current state
+        logger.info("Fetching from target repository to get current state")
         fetch_cmd = ["git", "fetch", "target", "--prune"]
-        return_code, _, stderr = self.run_git_command(fetch_cmd)
-
+        return_code, stdout, stderr = self.run_git_command(fetch_cmd)
+        
         if return_code != 0:
             logger.warning("Failed to fetch from target: %s", stderr)
             return set()
-
-        # Find all branches on the target
+        else:
+            logger.info("Successfully fetched from target repository")
+        
+        # List remote branches to find target branches
         remote_branches_cmd = ["git", "branch", "-r"]
         return_code, stdout, stderr = self.run_git_command(remote_branches_cmd)
-
+        
         if return_code != 0:
             logger.warning("Failed to list remote branches: %s", stderr)
             return set()
-
-        # Extract target branches
+        
+        # Extract only target branches
         target_branches = []
         for line in stdout.splitlines():
             branch = line.strip()
             if branch.startswith("target/"):
                 target_branches.append(branch)
-
+        
+        logger.info("Found %d target branches: %s", len(target_branches), target_branches)
+        
         if not target_branches:
             logger.info("No branches found on target repository")
             return set()
-
+        
+        # Get commit count using rev-list on target/master
+        if "target/master" in target_branches:
+            count_cmd = ["git", "rev-list", "--count", "target/master"]
+            return_code, stdout, stderr = self.run_git_command(count_cmd)
+            
+            if return_code == 0:
+                commit_count = int(stdout.strip())
+                logger.info("Target repository has %d commits on master branch", commit_count)
+            else:
+                logger.warning("Failed to get commit count: %s", stderr)
+        
         # Get all commit SHAs from target branches
         target_commits = set()
         for branch in target_branches:
-            log_cmd = ["git", "log", "--format=%H", branch]
-            return_code, stdout, stderr = self.run_git_command(log_cmd)
-
+            logger.info("Getting commits from branch: %s", branch)
+            rev_list_cmd = ["git", "rev-list", branch]
+            return_code, stdout, stderr = self.run_git_command(rev_list_cmd)
+            
             if return_code != 0:
-                logger.warning("Failed to get commit log for branch %s: %s", branch, stderr)
+                logger.warning("Failed to get commit list for branch %s: %s", branch, stderr)
                 continue
-
+            
+            # Count commits in this branch
+            branch_commits = 0
             # Add all commit SHAs to our set
             for commit_sha in stdout.splitlines():
                 if commit_sha.strip():
                     target_commits.add(commit_sha.strip())
-
-        logger.info("Found %d commits already pushed to target repository", len(target_commits))
+                    branch_commits += 1
+            
+            logger.info("Added %d commits from branch %s", branch_commits, branch)
+        
+        logger.info("Found %d total unique commits already pushed to target repository", len(target_commits))
+        
         return target_commits
 
     def push_in_chunks(self, step: int = 200) -> bool:
-        """
-        Push the repository in chunks to avoid the 2 GB limit.
-        Skips commits that have already been pushed to the target.
-
-        Args:
-            step: Number of commits per chunk (default: 200)
-
-        Returns:
-            True if successful, False otherwise
-        """
+        """Push the repository in chunks to avoid the 2 GB limit."""
         # Find all milestone commits
         milestones = self.find_milestones(step)
-
+        
         if not milestones:
             logger.error("No milestone commits found")
             return False
-
+        
+        logger.info("Found %d milestone commits", len(milestones))
+        logger.debug("Milestone commits: %s", milestones[:10])  # Log first 10 for debugging
+        
         # Find what branch we're working with
         branch_check_cmd = ["git", "branch"]
         _, stdout, _ = self.run_git_command(branch_check_cmd)
-        available_branches = [
-            b.strip().replace("* ", "") for b in stdout.strip().split("\n") if b.strip()
-        ]
+        available_branches = [b.strip().replace('* ', '') for b in stdout.strip().split("\n") if b.strip()]
         branch = "main"  # Default
-
+        
         if "main" in available_branches:
             branch = "main"
         elif "master" in available_branches:
             branch = "master"
         elif available_branches:
             branch = available_branches[0]
-
+        
         logger.info("Using branch %s for pushing", branch)
-
+        
         # Set up target remote - this must succeed before we continue
         if not self.setup_target_remote():
             logger.error("Failed to set up target remote for pushing")
             return False
-
+        
         # Get commits that already exist on the target
         already_pushed_commits = self.find_already_pushed_commits()
+        logger.info("Found %d commits already pushed to target repository", len(already_pushed_commits))
+        
+        # Force re-push the latest commit to ensure we're up to date
+        logger.info("Getting latest commit from source branch")
+        latest_cmd = ["git", "rev-parse", "HEAD"]
+        return_code, stdout, stderr = self.run_git_command(latest_cmd)
+        
+        if return_code == 0 and stdout.strip():
+            latest_commit = stdout.strip()
+            logger.info("Latest commit is %s - force pushing to target", latest_commit)
+            
+            # Force push the latest commit to ensure we're making progress
+            push_latest_cmd = ["git", "push", "target", f"+{latest_commit}:refs/heads/{branch}"]
+            return_code, stdout, stderr = self.run_git_command(push_latest_cmd)
+            
+            if return_code == 0:
+                logger.info("Successfully force-pushed latest commit to target")
+            else:
+                logger.warning("Failed to force-push latest commit: %s", stderr)
 
         # Set Git push options to handle timeouts better
         push_config_cmds = [
@@ -471,25 +510,22 @@ class LargeRepoHandler:
             ["git", "config", "http.lowSpeedTime", "300"],
             ["git", "config", "push.default", "upstream"],
         ]
-
+        
         for cmd in push_config_cmds:
             self.run_git_command(cmd)
-
+        
         # Check if the latest milestone is already pushed
         if milestones and milestones[-1] in already_pushed_commits:
-            logger.info(
-                "Latest milestone commit %s already exists on target. Repository is up to date.",
-                milestones[-1],
-            )
-
+            logger.info("Latest milestone commit %s already exists on target. Repository is up to date.", milestones[-1])
+            
             # Do a final mirror push to ensure all refs are synchronized
             logger.info("Performing final mirror push for all refs")
             mirror_cmd = ["git", "push", "target", "--mirror", "--force"]
-
+            
             max_retries = 3
             for attempt in range(1, max_retries + 1):
                 mirror_code, _, mirror_stderr = self.run_git_command(mirror_cmd)
-
+                
                 if mirror_code == 0:
                     logger.info("Successfully completed mirror push")
                     break
@@ -497,72 +533,66 @@ class LargeRepoHandler:
                     logger.warning("Mirror push attempt %d failed. Retrying...", attempt)
                     time.sleep(5)
                 else:
-                    logger.warning(
-                        "Final mirror push had issues after %d attempts: %s",
-                        max_retries,
-                        mirror_stderr,
-                    )
-
+                    logger.warning("Final mirror push had issues after %d attempts: %s", max_retries, mirror_stderr)
+            
             return True
-
+        
         # Push each milestone that hasn't been pushed already
         success = True
         max_retries = 3
+        commits_pushed = 0
         for commit_sha in milestones:
             # Skip if already pushed
             if commit_sha in already_pushed_commits:
                 logger.info("Skipping milestone commit %s - already exists on target", commit_sha)
                 continue
-
+                
             logger.info("Pushing milestone commit: %s", commit_sha)
             # Use force push with the + prefix to overcome non-fast-forward errors
             push_cmd = ["git", "push", "target", f"+{commit_sha}:refs/heads/{branch}"]
-
+            
             # Try up to 3 times
             for attempt in range(1, max_retries + 1):
                 return_code, _, stderr = self.run_git_command(push_cmd)
-
+                
                 if return_code == 0:
                     logger.info("Successfully pushed milestone %s", commit_sha)
                     # Add to our set of already pushed commits
                     already_pushed_commits.add(commit_sha)
+                    commits_pushed += 1
+                    logger.info("Commits pushed in this session: %d", commits_pushed)
                     break
                 elif attempt < max_retries:
-                    logger.warning(
-                        "Push attempt %d failed for %s. Retrying...", attempt, commit_sha
-                    )
-                    backoff_time = 5 * (2 ** (attempt - 1))  # 5s, 10s, 20s...
-                    logger.info(
-                        "Exponential backoff: Waiting %d seconds before retry", backoff_time
-                    )
+                    logger.warning("Push attempt %d failed for %s. Retrying...", attempt, commit_sha)
+                    backoff_time = 5 * (2**(attempt-1))  # 5s, 10s, 20s...
+                    logger.info("Exponential backoff: Waiting %d seconds before retry", backoff_time)
                     time.sleep(backoff_time)
                 else:
                     if "pack exceeds maximum allowed size" in stderr:
-                        logger.warning(
-                            "Pack size exceeded at commit %s, reducing step size", commit_sha
-                        )
+                        logger.warning("Pack size exceeded at commit %s, reducing step size", commit_sha)
                         # Reduce step size and try again with just this segment
                         smaller_step = max(50, step // 2)  # Even smaller steps
                         logger.info("Retrying with smaller step size: %d", smaller_step)
-
+                        
                         # Recursively call with smaller step
                         return self.push_in_chunks(step=smaller_step)
                     else:
-                        logger.error(
-                            "Failed to push milestone %s after %d attempts: %s",
-                            commit_sha,
-                            max_retries,
-                            stderr,
-                        )
+                        logger.error("Failed to push milestone %s after %d attempts: %s", commit_sha, max_retries, stderr)
                         success = False
-
+        
+        logger.info("Finished pushing milestones. Total commits pushed in this session: %d", commits_pushed)
+        
+        # After pushing all milestones, verify the number of commits on target
+        after_push_commits = self.find_already_pushed_commits()
+        logger.info("After pushing all milestones, found %d commits on target", len(after_push_commits))
+        
         # Final mirror push for any remaining refs - also with retry
         logger.info("Performing final mirror push for all refs")
         mirror_cmd = ["git", "push", "target", "--mirror", "--force"]
-
+        
         for attempt in range(1, max_retries + 1):
             mirror_code, _, mirror_stderr = self.run_git_command(mirror_cmd)
-
+            
             if mirror_code == 0:
                 logger.info("Successfully completed mirror push")
                 break
@@ -570,11 +600,13 @@ class LargeRepoHandler:
                 logger.warning("Mirror push attempt %d failed. Retrying...", attempt)
                 time.sleep(5)
             else:
-                logger.warning(
-                    "Final mirror push had issues after %d attempts: %s", max_retries, mirror_stderr
-                )
+                logger.warning("Final mirror push had issues after %d attempts: %s", max_retries, mirror_stderr)
                 # Don't fail the whole operation for this - we already pushed the main branch
-
+        
+        # Final verification after mirror push
+        final_commits = self.find_already_pushed_commits()
+        logger.info("After final mirror push, found %d commits on target", len(final_commits))
+        
         return success
 
     def find_milestones(self, step: int = 1000) -> List[str]:
@@ -660,7 +692,7 @@ class LargeRepoHandler:
 
         Args:
             step: Number of commits per chunk (default: 1000)
-
+            
         Returns:
             True if successful, False otherwise
         """
@@ -669,17 +701,21 @@ class LargeRepoHandler:
                 "Starting large repo mirroring: %s -> %s (chunk size: %d commits)",
                 self.source_project_path,
                 self.target_project_path,
-                step,
+                step
             )
-
+            
             # Clone the source repository
             if not self.clone_source_repo():
                 return False
-
+                
             # Set up the target remote
             if not self.setup_target_remote():
                 return False
-
+                
+            # Check how many commits are already on the target before pushing
+            existing_commits = self.find_already_pushed_commits()
+            logger.info("Before pushing, found %d commits already on target", len(existing_commits))
+                
             # Push in chunks with the specified step size
             if not self.push_in_chunks(step=step):
                 logger.warning("Chunked push had some issues, trying with smaller chunks...")
@@ -688,18 +724,23 @@ class LargeRepoHandler:
                 if not self.push_in_chunks(step=smaller_step):
                     logger.error("Failed to push even with smaller chunks")
                     return False
-
+                    
+            # Check how many commits are on the target after pushing
+            after_push_commits = self.find_already_pushed_commits()
+            logger.info("After pushing, found %d commits on target (added %d)", 
+                        len(after_push_commits), len(after_push_commits) - len(existing_commits))
+            
             logger.info(
                 "Successfully mirrored large repository: %s -> %s",
                 self.source_project_path,
                 self.target_project_path,
             )
             return True
-
+            
         except Exception as e:
             logger.error("Unexpected error during large repo mirroring: %s", e)
             return False
-
+    
     def mirror_repository(self) -> bool:
         """
         Mirror repository based on the shallow flag.
