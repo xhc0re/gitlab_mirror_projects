@@ -50,6 +50,7 @@ class MirrorConfig(BaseModel):
     target: GitLabConfig
     projects_file: Path
     assign_users: bool = False
+    shallow: bool = False
 
     @field_validator("projects_file")
     @classmethod

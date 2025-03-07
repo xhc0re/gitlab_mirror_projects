@@ -58,6 +58,11 @@ def main():
         default=os.environ.get("ASSIGN_USERS_TO_GROUPS", "false").lower() in ("true", "1", "yes"),
     )
     parser.add_argument("--debug", help="Enable debug logging", action="store_true")
+    parser.add_argument(
+        "--shallow",
+        action="store_true",
+        help="Perform shallow clone (no history) for faster migration",
+    )
 
     args = parser.parse_args()
 

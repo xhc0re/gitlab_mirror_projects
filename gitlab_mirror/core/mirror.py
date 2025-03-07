@@ -5,15 +5,15 @@ Provides abstraction for GitLab connections and mirroring operations.
 
 import csv
 import logging
-import time
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 from gitlab.exceptions import GitlabCreateError, GitlabGetError, GitlabHttpError, GitlabListError
 
-from gitlab_mirror.core.config import GitLabConfig, MirrorConfig
+from gitlab_mirror.core.config import GitLabConfig, MirrorConfig, get_env_variable
 from gitlab_mirror.core.exceptions import ApiError, ConfigError
+from gitlab_mirror.utils.large_repo_handler import is_large_repository, mirror_large_repository
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -126,6 +126,7 @@ class MirrorService:
         self.config = config
         self.source = GitLabConnector(config.source)
         self.target = GitLabConnector(config.target)
+        self.shallow = config.shallow  # Store shallow option
         self.group_cache: Dict[str, int] = {}
         self.errors: List[Dict[str, str]] = []
 
@@ -287,7 +288,7 @@ class MirrorService:
                 # Use specified target group
                 target_group_path = mapping.target_group
 
-            # Dodaj log dla debugowania
+            # Log for debugging
             logger.debug("Target group path: %s", target_group_path)
 
             # Ensure target group exists (if any)
@@ -301,7 +302,7 @@ class MirrorService:
                 f"{target_group_path}/{project_name}" if target_group_path else project_name
             )
 
-            # Zapisz poprawną ścieżkę do logów i obiektów błędów
+            # Log correct path
             logger.info("Target path will be: %s", target_path)
 
             # Check if target project exists
@@ -319,16 +320,59 @@ class MirrorService:
                 self.target.create_project(name=project_name, namespace_id=group_id)
                 logger.info("Created target project: %s", target_path)
 
-            # Set up mirroring
-            target_domain = self.target.config.url.split("//")[1].split("/")[0]
-            mirror_url = f"https://oauth2:{self.target.config.token.get_secret_value()}@{target_domain}/{target_path}.git"  # noqa: E501, E231
+            threshold_mb = int(
+                get_env_variable("LARGE_REPO_SIZE_THRESHOLD", required=False) or "1800"
+            )
 
-            self.setup_push_mirror(source_project, mirror_url)
+            is_large = is_large_repository(
+                self.source.client, source_project.id, threshold_mb=threshold_mb
+            )
 
-            # Trigger initial sync
-            self.trigger_mirror_sync(source_project.id)
-            time.sleep(600)
-            return True
+            if is_large:
+                logger.info(
+                    "Repository %s is large (>%d MB). Using chunked mirroring approach.",
+                    mapping.source_path,
+                    threshold_mb,
+                )
+
+                # Extract domain parts from URLs
+                source_domain = self.source.config.url.split("//")[1].split("/")[0]
+                target_domain = self.target.config.url.split("//")[1].split("/")[0]
+
+                # Setup mirroring using the large repo handler
+                success = mirror_large_repository(
+                    source_url=source_domain,
+                    source_project_path=mapping.source_path,
+                    source_token=self.source.config.token.get_secret_value(),
+                    target_url=target_domain,
+                    target_project_path=target_path,
+                    target_token=self.target.config.token.get_secret_value(),
+                    chunk_size=int(
+                        get_env_variable("LARGE_REPO_CHUNK_SIZE", required=False) or "25"
+                    ),
+                    shallow=self.shallow,
+                )
+
+                if not success:
+                    logger.error("Failed to mirror large repository: %s", mapping.source_path)
+                    return False
+
+                logger.info(
+                    "Successfully mirrored large repository: %s -> %s",
+                    mapping.source_path,
+                    target_path,
+                )
+                return True
+            else:
+                # Set up mirroring for normal-sized repositories
+                target_domain = self.target.config.url.split("//")[1].split("/")[0]
+                mirror_url = f"https://oauth2:{self.target.config.token.get_secret_value()}@{target_domain}/{target_path}.git"  # noqa: E501, E231
+
+                self.setup_push_mirror(source_project, mirror_url)
+
+                # Trigger initial sync
+                self.trigger_mirror_sync(source_project.id)
+                return True
         except ApiError as e:
             logger.error("API error mirroring project %s: %s", mapping.source_path, e)
             self.errors.append(
@@ -336,7 +380,7 @@ class MirrorService:
                     "source": mapping.source_path,
                     "target": (
                         mapping.target_path
-                        if "mapping_target_path" in locals()
+                        if "mapping.target_path" in locals()
                         else mapping.target_path
                     ),
                     "error_type": "ApiError",
@@ -351,7 +395,7 @@ class MirrorService:
                     "source": mapping.source_path,
                     "target": (
                         mapping.target_path
-                        if "mapping_target_path" in locals()
+                        if "mapping.target_path" in locals()
                         else mapping.target_path
                     ),
                     "error_type": "ValueError",
@@ -366,7 +410,7 @@ class MirrorService:
                     "source": mapping.source_path,
                     "target": (
                         mapping.target_path
-                        if "mapping_target_path" in locals()
+                        if "mapping.target_path" in locals()
                         else mapping.target_path
                     ),
                     "error_type": "UnexpectedError",
